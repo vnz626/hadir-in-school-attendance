@@ -1,0 +1,37 @@
+# Ignored docs as requested
+docs/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment files
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# Build outputs & caches
+dist/
+build/
+.next/
+out/
+.turbo/
+.cache/
+
+# Testing & coverage
+coverage/
+test-results/
+playwright-report/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
