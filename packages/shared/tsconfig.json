@@ -1,0 +1,6 @@
+{
+  "extends": "@hadirin/config/tsconfig.lib.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": "src" },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

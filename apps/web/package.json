@@ -1,0 +1,25 @@
+{
+  "name": "@hadirin/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
+    "test": "echo \"tidak ada tes web di Fase 1\""
+  },
+  "dependencies": {
+    "@hadirin/shared": "workspace:*",
+    "@hadirin/ui-tokens": "workspace:*",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@hadirin/config": "workspace:*",
+    "@types/node": "22.19.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "5.9.3"
+  }
+}

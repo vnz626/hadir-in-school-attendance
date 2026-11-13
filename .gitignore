@@ -20,6 +20,7 @@ build/
 out/
 .turbo/
 .cache/
+*.tsbuildinfo
 
 # Testing & coverage
 coverage/
@@ -35,3 +36,12 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+
+# Berkas lokal (AGENTS.md §8)
+storage/
+backups/
+*.sql.gz
+
+# Klien Prisma hasil generate
+apps/api/src/generated/

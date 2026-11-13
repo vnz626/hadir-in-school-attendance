@@ -1,0 +1,33 @@
+{
+  "name": "hadir-in",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:tunnel": "cloudflared tunnel --url http://localhost:3000",
+    "build": "turbo run build",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "echo \"E2E dimulai di Fase 4\"",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "db:setup": "pnpm --filter @hadirin/api db:setup",
+    "db:migrate": "pnpm --filter @hadirin/api db:migrate",
+    "db:reset": "pnpm --filter @hadirin/api db:reset",
+    "db:seed": "pnpm --filter @hadirin/api db:seed",
+    "db:backup": "pnpm --filter @hadirin/api db:backup"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "3.10.1",
+    "turbo": "2.11.11",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.2"
+  }
+}

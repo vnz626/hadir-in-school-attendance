@@ -1,0 +1,16 @@
+{
+  "extends": "@hadirin/config/tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "outDir": "dist",
+    "rootDir": ".",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "isolatedModules": false,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": ["src", "prisma", "scripts", "test"],
+  "exclude": ["dist", "node_modules"]
+}

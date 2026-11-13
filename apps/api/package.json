@@ -1,0 +1,46 @@
+{
+  "name": "@hadirin/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "dev": "concurrently -n api,worker -c blue,magenta \"nest start --watch\" \"nest start --watch --entryFile main.worker\"",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "test": "prisma generate && vitest run",
+    "db:setup": "tsx scripts/db-setup.ts",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:reset": "tsx scripts/db-reset.ts",
+    "db:seed": "prisma generate && tsx prisma/seed.ts",
+    "db:seed:load": "prisma generate && tsx prisma/seed.ts --load",
+    "db:backup": "tsx scripts/db-backup.ts",
+    "db:migrate:new": "tsx scripts/db-migrate-new.ts",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@hadirin/domain": "workspace:*",
+    "@hadirin/shared": "workspace:*",
+    "@nestjs/common": "11.2.10",
+    "@nestjs/core": "11.2.10",
+    "@nestjs/platform-express": "11.2.10",
+    "@prisma/adapter-mariadb": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "argon2": "0.45.2",
+    "dotenv": "18.0.10",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "uuid": "11.1.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@hadirin/config": "workspace:*",
+    "@nestjs/cli": "11.0.24",
+    "@types/express": "^5.0.0",
+    "@types/node": "22.19.0",
+    "concurrently": "^9.2.0",
+    "mariadb": "3.5.5",
+    "prisma": "7.10.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

@@ -1,0 +1,956 @@
+// Skema Hadir.in (Rancangan §10). Dibekukan di akhir Fase 1: perubahan lewat migrasi baru + ADR.
+// Konvensi: camelCase di kode, snake_case di database (@map), UUID v7 CHAR(36), waktu DATETIME(3) UTC,
+// tanggal kalender DATE, jam dinding SMALLINT menit sejak 00:00, semua FK RESTRICT.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ---------- Enum ----------
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum StaffPosition {
+  PICKET
+  COUNSELOR
+  PRINCIPAL
+}
+
+enum StudentStatus {
+  ACTIVE
+  GRADUATED
+  MOVED
+  DROPPED
+}
+
+enum WaOptSource {
+  PORTAL
+  REPLY
+  ADMIN
+}
+
+enum AttendanceModeSetting {
+  DAILY_ONLY
+  SUBJECT_ONLY
+  BOTH
+}
+
+enum PercentageRule {
+  EXCLUDE_EXCUSED
+  INCLUDE_EXCUSED
+}
+
+enum EnrollmentEndReason {
+  PROMOTED
+  MOVED_CLASS
+  MOVED_SCHOOL
+  GRADUATED
+  DROPPED
+}
+
+enum HolidayScope {
+  ALL
+  GRADE
+  CLASS
+}
+
+enum SessionType {
+  DAILY
+  SUBJECT
+}
+
+enum SessionStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  EXCUSED
+  SICK
+  DISPENSED
+  ABSENT
+}
+
+enum AttendanceMethod {
+  QR
+  CODE
+  MANUAL
+  LEAVE
+  AUTO
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+}
+
+enum AuditSource {
+  CORRECTION
+  LEAVE_APPROVAL
+  LEAVE_REVOKED
+}
+
+enum DailyStatusSource {
+  DAILY_SESSION
+  DERIVED
+}
+
+enum DeviceStatus {
+  ACTIVE
+  PENDING
+  REVOKED
+}
+
+enum DeviceBindMethod {
+  FIRST_LOGIN
+  SELF_REBIND
+  APPROVED
+}
+
+enum LeaveType {
+  EXCUSED
+  SICK
+  DISPENSED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  INAPP
+  EMAIL
+}
+
+enum NotificationTemplateKey {
+  ABSENT
+  LATE
+  DAILY_DIGEST
+  CORRECTION
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  OTP
+  MAGIC_LINK
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  SKIPPED
+}
+
+enum LoginTokenPurpose {
+  MAGIC_LINK
+  OTP
+  PASSWORD_RESET
+}
+
+enum ImportKind {
+  STUDENTS
+  TEACHERS
+  PARENTS
+  SCHEDULES
+}
+
+enum ImportStatus {
+  PREVIEW
+  COMMITTED
+  FAILED
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+// ---------- 1. Sekolah, pengguna, geofence ----------
+
+model School {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  name      String   @db.VarChar(150)
+  npsn      String?  @unique @db.VarChar(20)
+  address   String?  @db.VarChar(500)
+  timezone  String   @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  settings              SchoolSetting?
+  users                 User[]
+  geofences             Geofence[]
+  academicYears         AcademicYear[]
+  subjects              Subject[]
+  holidays              Holiday[]
+  sessions              AttendanceSession[]
+  notificationTemplates NotificationTemplate[]
+  notifications         Notification[]
+  imports               Import[]
+  auditLogs             AuditLog[]
+
+  @@map("schools")
+}
+
+model SchoolSetting {
+  id                        String                @id @default(uuid(7)) @db.Char(36)
+  schoolId                  String                @unique @map("school_id") @db.Char(36)
+  checkinModes              Json                  @map("checkin_modes")
+  attendanceMode            AttendanceModeSetting @default(DAILY_ONLY) @map("attendance_mode")
+  schoolDays                Json                  @map("school_days")
+  dailyStartTime            Int                   @default(420) @map("daily_start_time") @db.SmallInt
+  dailyCloseTime            Int                   @default(540) @map("daily_close_time") @db.SmallInt
+  defaultLateAfterMinutes   Int                   @default(10) @map("default_late_after_minutes")
+  lateAfterOpenGraceMinutes Int                   @default(5) @map("late_after_open_grace_minutes")
+  adhocSessionMinutes       Int                   @default(60) @map("adhoc_session_minutes")
+  geofenceEnabled           Boolean               @default(false) @map("geofence_enabled")
+  locationAccuracyMaxM      Int                   @default(100) @map("location_accuracy_max_m")
+  deviceBindingEnabled      Boolean               @default(false) @map("device_binding_enabled")
+  deviceSelfRebindDays      Int                   @default(60) @map("device_self_rebind_days")
+  percentageRule            PercentageRule        @default(EXCLUDE_EXCUSED) @map("percentage_rule")
+  notifyQuietStart          Int                   @default(360) @map("notify_quiet_start") @db.SmallInt
+  notifyQuietEnd            Int                   @default(1200) @map("notify_quiet_end") @db.SmallInt
+  subjectDigestTime         Int                   @default(900) @map("subject_digest_time") @db.SmallInt
+  backfillDays              Int                   @default(7) @map("backfill_days")
+  retentionYears            Int                   @default(3) @map("retention_years")
+  createdAt                 DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt                 DateTime              @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("school_settings")
+}
+
+model User {
+  id                 String    @id @default(uuid(7)) @db.Char(36)
+  schoolId           String    @map("school_id") @db.Char(36)
+  role               UserRole
+  name               String    @db.VarChar(150)
+  email              String?   @unique @db.VarChar(190)
+  loginId            String?   @map("login_id") @db.VarChar(50)
+  phone              String?   @db.VarChar(32)
+  passwordHash       String?   @map("password_hash") @db.VarChar(255)
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  isActive           Boolean   @default(true) @map("is_active")
+  lastLoginAt        DateTime? @map("last_login_at") @db.DateTime(3)
+  deletedAt          DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school             School                 @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  teacher            Teacher?
+  student            Student?
+  parent             Parent?
+  openedSessions     AttendanceSession[]    @relation("SessionOpenedBy")
+  closedSessions     AttendanceSession[]    @relation("SessionClosedBy")
+  createdAttendances Attendance[]
+  auditChanges       AttendanceAudit[]
+  assignedSubs       ScheduleSubstitution[]
+  approvedDevices    Device[]
+  requestedLeaves    LeaveRequest[]         @relation("LeaveRequestedBy")
+  reviewedLeaves     LeaveRequest[]         @relation("LeaveReviewedBy")
+  imports            Import[]
+  auditLogs          AuditLog[]
+  refreshTokens      RefreshToken[]
+  loginTokens        LoginToken[]
+
+  @@unique([schoolId, loginId])
+  @@map("users")
+}
+
+model Geofence {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  schoolId  String   @map("school_id") @db.Char(36)
+  name      String   @db.VarChar(100)
+  lat       Decimal  @db.Decimal(10, 7)
+  lng       Decimal  @db.Decimal(10, 7)
+  radiusM   Int      @map("radius_m")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attendances Attendance[]
+
+  @@index([schoolId])
+  @@map("geofences")
+}
+
+// ---------- 2. Akademik: tahun ajaran, semester, guru, jabatan, mapel ----------
+
+model AcademicYear {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  schoolId  String   @map("school_id") @db.Char(36)
+  name      String   @db.VarChar(20)
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  isActive  Boolean  @default(false) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school         School                    @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  terms          Term[]
+  classes        Class[]
+  enrollments    ClassEnrollment[]
+  staffPositions StaffPositionAssignment[]
+
+  @@unique([schoolId, name])
+  @@map("academic_years")
+}
+
+model Term {
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  academicYearId String   @map("academic_year_id") @db.Char(36)
+  semester       Int      @db.SmallInt
+  startDate      DateTime @map("start_date") @db.Date
+  endDate        DateTime @map("end_date") @db.Date
+  isActive       Boolean  @default(false) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  academicYear AcademicYear        @relation(fields: [academicYearId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  schedules    Schedule[]
+  sessions     AttendanceSession[]
+
+  @@unique([academicYearId, semester])
+  @@map("terms")
+}
+
+model Teacher {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  userId    String   @unique @map("user_id") @db.Char(36)
+  nip       String?  @unique @db.VarChar(30)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user          User                      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  positions     StaffPositionAssignment[]
+  homeroomOf    Class[]
+  schedules     Schedule[]
+  substitutions ScheduleSubstitution[]
+
+  @@map("teachers")
+}
+
+// Nama model berbeda dari enum StaffPosition; tabelnya tetap `staff_positions`.
+model StaffPositionAssignment {
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  teacherId      String        @map("teacher_id") @db.Char(36)
+  position       StaffPosition
+  academicYearId String        @map("academic_year_id") @db.Char(36)
+  startsOn       DateTime      @map("starts_on") @db.Date
+  endsOn         DateTime?     @map("ends_on") @db.Date
+  createdAt      DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+
+  teacher      Teacher      @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([teacherId, position])
+  @@index([academicYearId])
+  @@map("staff_positions")
+}
+
+model Subject {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  schoolId  String   @map("school_id") @db.Char(36)
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school    School              @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  schedules Schedule[]
+  sessions  AttendanceSession[]
+
+  @@unique([schoolId, code])
+  @@map("subjects")
+}
+
+// ---------- 3. Kelas, siswa, orang tua ----------
+
+model Class {
+  id                String    @id @default(uuid(7)) @db.Char(36)
+  academicYearId    String    @map("academic_year_id") @db.Char(36)
+  name              String    @db.VarChar(50)
+  grade             Int
+  homeroomTeacherId String?   @map("homeroom_teacher_id") @db.Char(36)
+  deletedAt         DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  academicYear    AcademicYear        @relation(fields: [academicYearId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  homeroomTeacher Teacher?            @relation(fields: [homeroomTeacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  enrollments     ClassEnrollment[]
+  schedules       Schedule[]
+  sessions        AttendanceSession[]
+  attendances     Attendance[]
+  holidays        Holiday[]
+  dailyStatuses   DailyStatus[]
+
+  @@unique([academicYearId, name])
+  @@index([homeroomTeacherId])
+  @@map("classes")
+}
+
+model Student {
+  id        String        @id @default(uuid(7)) @db.Char(36)
+  userId    String        @unique @map("user_id") @db.Char(36)
+  nis       String        @unique @db.VarChar(30)
+  nisn      String?       @db.VarChar(20)
+  status    StudentStatus @default(ACTIVE)
+  deletedAt DateTime?     @map("deleted_at") @db.DateTime(3)
+  createdAt DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user          User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  enrollments   ClassEnrollment[]
+  parents       StudentParent[]
+  attendances   Attendance[]
+  dailyStatuses DailyStatus[]
+  devices       Device[]
+  leaveRequests LeaveRequest[]
+  notifications Notification[]
+
+  @@map("students")
+}
+
+model ClassEnrollment {
+  id                String               @id @default(uuid(7)) @db.Char(36)
+  studentId         String               @map("student_id") @db.Char(36)
+  classId           String               @map("class_id") @db.Char(36)
+  academicYearId    String               @map("academic_year_id") @db.Char(36)
+  startDate         DateTime             @map("start_date") @db.Date
+  endDate           DateTime?            @map("end_date") @db.Date
+  endReason         EnrollmentEndReason? @map("end_reason")
+  // Kolom kunci: CONCAT(student_id,'|',academic_year_id) hanya saat end_date IS NULL (Rancangan §10.3).
+  openEnrollmentKey String?              @unique @map("open_enrollment_key") @db.VarChar(80)
+  createdAt         DateTime             @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime             @updatedAt @map("updated_at") @db.DateTime(3)
+
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([classId, startDate, endDate])
+  @@index([studentId, startDate])
+  @@map("class_enrollments")
+}
+
+model Parent {
+  id          String       @id @default(uuid(7)) @db.Char(36)
+  userId      String       @unique @map("user_id") @db.Char(36)
+  phoneWa     String       @unique @map("phone_wa") @db.VarChar(20)
+  waOptIn     Boolean      @default(false) @map("wa_opt_in")
+  waOptInAt   DateTime?    @map("wa_opt_in_at") @db.DateTime(3)
+  waOptOutAt  DateTime?    @map("wa_opt_out_at") @db.DateTime(3)
+  waOptSource WaOptSource? @map("wa_opt_source")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  students      StudentParent[]
+  notifications Notification[]
+
+  @@map("parents")
+}
+
+model StudentParent {
+  id                    String   @id @default(uuid(7)) @db.Char(36)
+  studentId             String   @map("student_id") @db.Char(36)
+  parentId              String   @map("parent_id") @db.Char(36)
+  relation              String   @db.VarChar(30)
+  isPrimary             Boolean  @default(false) @map("is_primary")
+  receivesNotifications Boolean  @default(true) @map("receives_notifications")
+  createdAt             DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  parent  Parent  @relation(fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([studentId, parentId])
+  @@index([parentId])
+  @@map("student_parents")
+}
+
+// ---------- 4. Jadwal, pengganti, libur ----------
+
+model Schedule {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  termId    String   @map("term_id") @db.Char(36)
+  classId   String   @map("class_id") @db.Char(36)
+  subjectId String   @map("subject_id") @db.Char(36)
+  teacherId String   @map("teacher_id") @db.Char(36)
+  dayOfWeek Int      @map("day_of_week") @db.SmallInt
+  startTime Int      @map("start_time") @db.SmallInt
+  endTime   Int      @map("end_time") @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  term          Term                   @relation(fields: [termId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  class         Class                  @relation(fields: [classId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  subject       Subject                @relation(fields: [subjectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  teacher       Teacher                @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  substitutions ScheduleSubstitution[]
+  sessions      AttendanceSession[]
+
+  @@index([termId, classId, dayOfWeek])
+  @@index([teacherId, dayOfWeek])
+  @@index([subjectId])
+  @@map("schedules")
+}
+
+model ScheduleSubstitution {
+  id                  String   @id @default(uuid(7)) @db.Char(36)
+  scheduleId          String   @map("schedule_id") @db.Char(36)
+  date                DateTime @db.Date
+  substituteTeacherId String   @map("substitute_teacher_id") @db.Char(36)
+  assignedById        String   @map("assigned_by_id") @db.Char(36)
+  reason              String?  @db.VarChar(255)
+  createdAt           DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  schedule          Schedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  substituteTeacher Teacher  @relation(fields: [substituteTeacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  assignedBy        User     @relation(fields: [assignedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([scheduleId, date])
+  @@index([substituteTeacherId, date])
+  @@index([assignedById])
+  @@map("schedule_substitutions")
+}
+
+model Holiday {
+  id        String       @id @default(uuid(7)) @db.Char(36)
+  schoolId  String       @map("school_id") @db.Char(36)
+  name      String       @db.VarChar(150)
+  dateFrom  DateTime     @map("date_from") @db.Date
+  dateTo    DateTime     @map("date_to") @db.Date
+  scope     HolidayScope
+  grade     Int?
+  classId   String?      @map("class_id") @db.Char(36)
+  createdAt DateTime     @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  class  Class? @relation(fields: [classId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([schoolId, dateFrom, dateTo])
+  @@index([classId])
+  @@map("holidays")
+}
+
+// ---------- 5. Kehadiran ----------
+
+model AttendanceSession {
+  id               String        @id @default(uuid(7)) @db.Char(36)
+  schoolId         String        @map("school_id") @db.Char(36)
+  classId          String        @map("class_id") @db.Char(36)
+  termId           String        @map("term_id") @db.Char(36)
+  scheduleId       String?       @map("schedule_id") @db.Char(36)
+  subjectId        String?       @map("subject_id") @db.Char(36)
+  type             SessionType
+  sessionDate      DateTime      @map("session_date") @db.Date
+  startsAt         DateTime      @map("starts_at") @db.DateTime(3)
+  lateAfterMinutes Int           @map("late_after_minutes")
+  lateThresholdAt  DateTime      @map("late_threshold_at") @db.DateTime(3)
+  openedAt         DateTime      @map("opened_at") @db.DateTime(3)
+  openedById       String        @map("opened_by_id") @db.Char(36)
+  closesAt         DateTime      @map("closes_at") @db.DateTime(3)
+  closedAt         DateTime?     @map("closed_at") @db.DateTime(3)
+  // null = ditutup sistem
+  closedById       String?       @map("closed_by_id") @db.Char(36)
+  status           SessionStatus @default(OPEN)
+  cancelReason     String?       @map("cancel_reason") @db.VarChar(255)
+  qrSecretEnc      String        @map("qr_secret_enc") @db.VarChar(255)
+  isBackfill       Boolean       @default(false) @map("is_backfill")
+  // Kolom kunci (Rancangan §10.3): satu sesi per jadwal per tanggal, satu sesi DAILY per kelas per tanggal.
+  scheduleSlotKey  String?       @unique @map("schedule_slot_key") @db.VarChar(80)
+  dailySlotKey     String?       @unique @map("daily_slot_key") @db.VarChar(80)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  class       Class        @relation(fields: [classId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  term        Term         @relation(fields: [termId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  schedule    Schedule?    @relation(fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  subject     Subject?     @relation(fields: [subjectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  openedBy    User         @relation("SessionOpenedBy", fields: [openedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  closedBy    User?        @relation("SessionClosedBy", fields: [closedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attendances Attendance[]
+
+  @@index([classId, sessionDate, status])
+  @@index([status, closesAt])
+  @@index([scheduleId])
+  @@index([termId])
+  @@index([subjectId])
+  @@index([schoolId, sessionDate])
+  @@index([openedById])
+  @@index([closedById])
+  @@map("attendance_sessions")
+}
+
+model Attendance {
+  id             String           @id @default(uuid(7)) @db.Char(36)
+  sessionId      String           @map("session_id") @db.Char(36)
+  studentId      String           @map("student_id") @db.Char(36)
+  // class_id, session_date, session_type disalin dari sesi agar rekap tanpa join.
+  classId        String           @map("class_id") @db.Char(36)
+  sessionDate    DateTime         @map("session_date") @db.Date
+  sessionType    SessionType      @map("session_type")
+  status         AttendanceStatus
+  method         AttendanceMethod
+  checkedInAt    DateTime?        @map("checked_in_at") @db.DateTime(3)
+  lateMinutes    Int              @default(0) @map("late_minutes")
+  // Koordinat mentah TIDAK disimpan (ADR 006).
+  distanceM      Int?             @map("distance_m")
+  accuracyM      Int?             @map("accuracy_m")
+  geofenceId     String?          @map("geofence_id") @db.Char(36)
+  deviceId       String?          @map("device_id") @db.Char(36)
+  leaveRequestId String?          @map("leave_request_id") @db.Char(36)
+  note           String?          @db.VarChar(500)
+  // null = dibuat sistem
+  createdById    String?          @map("created_by_id") @db.Char(36)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.DateTime(3)
+
+  session       AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  student       Student           @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  class         Class             @relation(fields: [classId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  geofence      Geofence?         @relation(fields: [geofenceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  device        Device?           @relation(fields: [deviceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  leaveRequest  LeaveRequest?     @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  audits        AttendanceAudit[]
+  notifications Notification[]
+
+  @@unique([sessionId, studentId])
+  @@index([studentId, sessionDate])
+  @@index([classId, sessionDate])
+  @@index([geofenceId])
+  @@index([deviceId])
+  @@index([leaveRequestId])
+  @@index([createdById])
+  @@map("attendances")
+}
+
+model AttendanceAudit {
+  id             String            @id @default(uuid(7)) @db.Char(36)
+  attendanceId   String            @map("attendance_id") @db.Char(36)
+  actorType      AuditActorType    @map("actor_type")
+  changedById    String?           @map("changed_by_id") @db.Char(36)
+  oldStatus      AttendanceStatus? @map("old_status")
+  newStatus      AttendanceStatus  @map("new_status")
+  oldMethod      AttendanceMethod? @map("old_method")
+  newMethod      AttendanceMethod  @map("new_method")
+  reason         String?           @db.VarChar(500)
+  source         AuditSource
+  leaveRequestId String?           @map("leave_request_id") @db.Char(36)
+  changedAt      DateTime          @map("changed_at") @db.DateTime(3)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+
+  attendance   Attendance    @relation(fields: [attendanceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  changedBy    User?         @relation(fields: [changedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  leaveRequest LeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([attendanceId, changedAt])
+  @@index([changedById])
+  @@index([leaveRequestId])
+  @@map("attendance_audits")
+}
+
+model DailyStatus {
+  id             String            @id @default(uuid(7)) @db.Char(36)
+  studentId      String            @map("student_id") @db.Char(36)
+  classId        String            @map("class_id") @db.Char(36)
+  date           DateTime          @db.Date
+  status         AttendanceStatus
+  source         DailyStatusSource
+  partialAbsence Boolean           @default(false) @map("partial_absence")
+  computedAt     DateTime          @map("computed_at") @db.DateTime(3)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  class   Class   @relation(fields: [classId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([studentId, date])
+  @@index([classId, date])
+  @@map("daily_statuses")
+}
+
+// ---------- 6. Perangkat dan pengajuan ----------
+
+model Device {
+  id               String           @id @default(uuid(7)) @db.Char(36)
+  studentId        String           @map("student_id") @db.Char(36)
+  deviceHash       String           @map("device_hash") @db.VarChar(128)
+  platform         String?          @db.VarChar(32)
+  label            String?          @db.VarChar(100)
+  status           DeviceStatus
+  bindMethod       DeviceBindMethod @map("bind_method")
+  boundAt          DateTime         @map("bound_at") @db.DateTime(3)
+  approvedById     String?          @map("approved_by_id") @db.Char(36)
+  revokedAt        DateTime?        @map("revoked_at") @db.DateTime(3)
+  revokeReason     String?          @map("revoke_reason") @db.VarChar(255)
+  sharedApproved   Boolean          @default(false) @map("shared_approved")
+  // Kolom kunci: student_id hanya saat status = 'ACTIVE' (satu perangkat aktif per siswa).
+  activeStudentKey String?          @unique @map("active_student_key") @db.VarChar(80)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.DateTime(3)
+
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  approvedBy  User?        @relation(fields: [approvedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attendances Attendance[]
+
+  @@index([studentId, status])
+  @@index([deviceHash])
+  @@index([approvedById])
+  @@map("devices")
+}
+
+model LeaveRequest {
+  id            String      @id @default(uuid(7)) @db.Char(36)
+  studentId     String      @map("student_id") @db.Char(36)
+  requestedById String      @map("requested_by_id") @db.Char(36)
+  requesterRole UserRole    @map("requester_role")
+  type          LeaveType
+  dateFrom      DateTime    @map("date_from") @db.Date
+  dateTo        DateTime    @map("date_to") @db.Date
+  timeFrom      Int?        @map("time_from") @db.SmallInt
+  timeTo        Int?        @map("time_to") @db.SmallInt
+  reason        String      @db.VarChar(500)
+  status        LeaveStatus @default(PENDING)
+  reviewedById  String?     @map("reviewed_by_id") @db.Char(36)
+  reviewedAt    DateTime?   @map("reviewed_at") @db.DateTime(3)
+  rejectReason  String?     @map("reject_reason") @db.VarChar(500)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.DateTime(3)
+
+  student       Student           @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requestedBy   User              @relation("LeaveRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reviewedBy    User?             @relation("LeaveReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attachments   LeaveAttachment[]
+  attendances   Attendance[]
+  audits        AttendanceAudit[]
+  notifications Notification[]
+
+  @@index([studentId, dateFrom, dateTo])
+  @@index([status, createdAt])
+  @@index([requestedById])
+  @@index([reviewedById])
+  @@map("leave_requests")
+}
+
+model LeaveAttachment {
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  leaveRequestId String   @map("leave_request_id") @db.Char(36)
+  storageKey     String   @map("storage_key") @db.VarChar(255)
+  mimeType       String   @map("mime_type") @db.VarChar(100)
+  sizeBytes      Int      @map("size_bytes")
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([leaveRequestId])
+  @@map("leave_attachments")
+}
+
+// ---------- 7. Notifikasi ----------
+
+model NotificationTemplate {
+  id                   String                  @id @default(uuid(7)) @db.Char(36)
+  schoolId             String                  @map("school_id") @db.Char(36)
+  key                  NotificationTemplateKey
+  channel              NotificationChannel
+  body                 String                  @db.Text
+  providerTemplateName String?                 @map("provider_template_name") @db.VarChar(100)
+  isEditable           Boolean                 @default(true) @map("is_editable")
+  createdAt            DateTime                @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt            DateTime                @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([schoolId, key, channel])
+  @@map("notification_templates")
+}
+
+model Notification {
+  id                String                  @id @default(uuid(7)) @db.Char(36)
+  schoolId          String                  @map("school_id") @db.Char(36)
+  studentId         String?                 @map("student_id") @db.Char(36)
+  parentId          String?                 @map("parent_id") @db.Char(36)
+  attendanceId      String?                 @map("attendance_id") @db.Char(36)
+  leaveRequestId    String?                 @map("leave_request_id") @db.Char(36)
+  channel           NotificationChannel
+  templateKey       NotificationTemplateKey @map("template_key")
+  dedupeKey         String                  @unique @map("dedupe_key") @db.VarChar(190)
+  payload           Json
+  status            NotificationStatus      @default(QUEUED)
+  skipReason        String?                 @map("skip_reason") @db.VarChar(100)
+  providerMessageId String?                 @map("provider_message_id") @db.VarChar(128)
+  attempts          Int                     @default(0)
+  lastError         String?                 @map("last_error") @db.Text
+  scheduledAt       DateTime                @map("scheduled_at") @db.DateTime(3)
+  sentAt            DateTime?               @map("sent_at") @db.DateTime(3)
+  deliveredAt       DateTime?               @map("delivered_at") @db.DateTime(3)
+  createdAt         DateTime                @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime                @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  student      Student?      @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  parent       Parent?       @relation(fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attendance   Attendance?   @relation(fields: [attendanceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  leaveRequest LeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([status, scheduledAt])
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([parentId])
+  @@index([attendanceId])
+  @@index([leaveRequestId])
+  @@map("notifications")
+}
+
+// ---------- 8. Autentikasi, impor, audit, infrastruktur ----------
+
+model RefreshToken {
+  id         String    @id @default(uuid(7)) @db.Char(36)
+  userId     String    @map("user_id") @db.Char(36)
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(64)
+  familyId   String    @map("family_id") @db.Char(36)
+  expiresAt  DateTime  @map("expires_at") @db.DateTime(3)
+  revokedAt  DateTime? @map("revoked_at") @db.DateTime(3)
+  replacedBy String?   @map("replaced_by") @db.Char(36)
+  ip         String?   @db.VarChar(45)
+  userAgent  String?   @map("user_agent") @db.VarChar(255)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model LoginToken {
+  id        String            @id @default(uuid(7)) @db.Char(36)
+  userId    String            @map("user_id") @db.Char(36)
+  purpose   LoginTokenPurpose
+  tokenHash String            @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime          @map("expires_at") @db.DateTime(3)
+  usedAt    DateTime?         @map("used_at") @db.DateTime(3)
+  attempts  Int               @default(0)
+  createdAt DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+  @@map("login_tokens")
+}
+
+model Import {
+  id          String       @id @default(uuid(7)) @db.Char(36)
+  schoolId    String       @map("school_id") @db.Char(36)
+  kind        ImportKind
+  status      ImportStatus @default(PREVIEW)
+  fileKey     String       @map("file_key") @db.VarChar(255)
+  totalRows   Int          @default(0) @map("total_rows")
+  validRows   Int          @default(0) @map("valid_rows")
+  errorRows   Int          @default(0) @map("error_rows")
+  report      Json?
+  createdById String       @map("created_by_id") @db.Char(36)
+  committedAt DateTime?    @map("committed_at") @db.DateTime(3)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.DateTime(3)
+
+  school    School @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy User   @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([schoolId, createdAt])
+  @@index([createdById])
+  @@map("imports")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  schoolId  String   @map("school_id") @db.Char(36)
+  actorId   String?  @map("actor_id") @db.Char(36)
+  action    String   @db.VarChar(64)
+  entity    String   @db.VarChar(64)
+  entityId  String?  @map("entity_id") @db.VarChar(64)
+  meta      Json?
+  ip        String?  @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actor  User?  @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([schoolId, createdAt])
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+model Job {
+  id          String    @id @default(uuid(7)) @db.Char(36)
+  queue       String    @db.VarChar(64)
+  payload     Json
+  dedupeKey   String?   @unique @map("dedupe_key") @db.VarChar(190)
+  status      JobStatus @default(PENDING)
+  runAt       DateTime  @map("run_at") @db.DateTime(3)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  lockedBy    String?   @map("locked_by") @db.VarChar(64)
+  lockedUntil DateTime? @map("locked_until") @db.DateTime(3)
+  lastError   String?   @map("last_error") @db.Text
+  finishedAt  DateTime? @map("finished_at") @db.DateTime(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@index([status, runAt])
+  @@index([queue, status, runAt])
+  @@map("jobs")
+}
+
+model IdempotencyKey {
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  scope          String   @db.VarChar(64)
+  key            String   @db.VarChar(128)
+  requestHash    String   @map("request_hash") @db.VarChar(64)
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  expiresAt      DateTime @map("expires_at") @db.DateTime(3)
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@unique([scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
