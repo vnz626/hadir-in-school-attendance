@@ -45,3 +45,13 @@ backups/
 
 # Klien Prisma hasil generate
 apps/api/src/generated/
+*.tsbuildinfo
+
+# e2e
+e2e/.storage/
+e2e/.worker.pid
+e2e/screenshots/
+
+# Hasil e2e
+e2e/playwright-report/
+e2e/test-results/

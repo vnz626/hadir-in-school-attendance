@@ -15,8 +15,8 @@ export interface DbConnectionConfig {
 const SESSION_INIT_SQL =
   "SET time_zone = '+00:00', sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'";
 
-export function createPrismaClient(config: DbConnectionConfig): PrismaClient {
-  const adapter = new PrismaMariaDb({
+export function createMariaDbAdapter(config: DbConnectionConfig): PrismaMariaDb {
+  return new PrismaMariaDb({
     host: config.host,
     port: config.port,
     user: config.user,
@@ -26,7 +26,10 @@ export function createPrismaClient(config: DbConnectionConfig): PrismaClient {
     timezone: "Z",
     initSql: SESSION_INIT_SQL,
   });
-  return new PrismaClient({ adapter });
+}
+
+export function createPrismaClient(config: DbConnectionConfig): PrismaClient {
+  return new PrismaClient({ adapter: createMariaDbAdapter(config) });
 }
 
 export type { PrismaClient };

@@ -8,3 +8,5 @@ export const calendarDateSchema = z
 export const minuteOfDaySchema = z.number().int().min(0).max(1439);
 
 export const healthResponseSchema = z.object({ status: z.literal("ok") });
+
+export const idParamSchema = z.string().uuid("ID tidak valid");

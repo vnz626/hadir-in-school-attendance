@@ -1,6 +1,9 @@
+import swc from "unplugin-swc";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // SWC memancarkan metadata dekorator yang dibutuhkan injeksi dependensi NestJS (esbuild tidak).
+  plugins: [swc.vite({ module: { type: "es6" } })],
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     globalSetup: ["test/global-setup.ts"],

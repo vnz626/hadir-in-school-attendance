@@ -21,6 +21,8 @@ export const COMMON_ERROR_CODE = {
   HOLIDAY: "HOLIDAY",
   SESSION_ALREADY_OPEN: "SESSION_ALREADY_OPEN",
   BACKFILL_WINDOW_PASSED: "BACKFILL_WINDOW_PASSED",
+  // Galat server tak terduga (HTTP 5xx). Tidak ada di daftar awal AGENTS.md §6; ditambahkan agar 500 tidak menyamar sebagai CONFLICT.
+  INTERNAL_ERROR: "INTERNAL_ERROR",
 } as const;
 
 export const ERROR_CODE = { ...CHECKIN_ERROR_CODE, ...COMMON_ERROR_CODE } as const;

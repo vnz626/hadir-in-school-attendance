@@ -56,8 +56,10 @@ describe("seed realistis", () => {
         where: { academicYearId: year.id, endReason: "MOVED_CLASS" },
       }),
     ).toBe(3);
+    // Dibatasi ke sekolah seed: tes lain berbagi database dan boleh membuat orang tua dengan dua anak.
     const sharedParents = await prisma.studentParent.groupBy({
       by: ["parentId"],
+      where: { student: { user: { schoolId } } },
       _count: { _all: true },
       having: { parentId: { _count: { gt: 1 } } },
     });

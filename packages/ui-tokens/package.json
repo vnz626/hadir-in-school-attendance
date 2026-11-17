@@ -4,13 +4,22 @@
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tokens.css": "./dist/tokens.css"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node dist/generate-css.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo \"tidak ada tes di Fase 1\""
+    "test": "vitest run"
   },
   "devDependencies": {
     "@hadirin/config": "workspace:*",
-    "typescript": "5.9.3"
+    "@types/node": "22.19.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
   }
 }

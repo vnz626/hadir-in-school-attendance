@@ -10,3 +10,7 @@ pnpm-lock.yaml
 apps/api/prisma/migrations
 AGENTS.md
 **/next-env.d.ts
+playwright-report
+test-results
+e2e/screenshots
+e2e/.storage

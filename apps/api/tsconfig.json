@@ -9,7 +9,7 @@
     "emitDecoratorMetadata": true,
     "isolatedModules": false,
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node", "multer"]
   },
   "include": ["src", "prisma", "scripts", "test"],
   "exclude": ["dist", "node_modules"]

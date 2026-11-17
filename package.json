@@ -13,12 +13,13 @@
     "format": "prettier --write .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:e2e": "echo \"E2E dimulai di Fase 4\"",
+    "test:e2e": "pnpm --filter @hadirin/api build && pnpm --filter @hadirin/e2e test:e2e",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "db:setup": "pnpm --filter @hadirin/api db:setup",
     "db:migrate": "pnpm --filter @hadirin/api db:migrate",
     "db:reset": "pnpm --filter @hadirin/api db:reset",
     "db:seed": "pnpm --filter @hadirin/api db:seed",
+    "db:create-admin": "pnpm --filter @hadirin/api db:create-admin",
     "db:backup": "pnpm --filter @hadirin/api db:backup"
   },
   "devDependencies": {

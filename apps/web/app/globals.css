@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "@hadirin/ui-tokens/tokens.css";
+
+/* Fokus terlihat di semua elemen interaktif, termasuk mode cepat (Rancangan §8): cincin 2 px, offset 2 px. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
